@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Book time with Kate</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 0; background:#fafafa; color:#111; }
+    .wrap { max-width: 780px; margin: 40px auto; padding: 0 16px; }
+    h1 { font-size: 28px; margin: 0 0 8px; }
+    p.muted { color:#555; margin-top:0; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap:12px; margin: 24px 0; }
+    .card { background:#fff; border:1px solid #eee; border-radius:16px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,0.04); }
+    .slot { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+    button { cursor:pointer; border:1px solid #ddd; background:#fff; padding:8px 12px; border-radius:999px; }
+    button.primary { background:#111; color:#fff; border-color:#111; }
+    dialog { border:none; border-radius:16px; padding:0; max-width: 520px; width: 100%; }
+    .modal { padding: 20px; }
+    label { display:block; margin:12px 0 6px; font-size:14px; color:#333; }
+    input[type="text"], input[type="email"] { width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:10px; }
+    .footer { margin-top: 8px; display:flex; justify-content:flex-end; gap:8px; }
+    .notice { padding:12px; background:#f2fff4; border:1px solid #d6f5da; border-radius:12px; margin-top:12px; }
+    .error { padding:12px; background:#fff4f4; border:1px solid #ffd6d6; border-radius:12px; margin-top:12px; color:#a00; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Book time with Kate</h1>
+    <p class="muted">Pick a time that works for you. You’ll get a calendar invite + Meet link by email.</p>
+
+    <div style="display:flex; gap:8px; align-items:center;">
+      <label for="duration" style="margin:0;">Duration</label>
+      <select id="duration" onchange="fetchSlots()">
+        <option value="15">15 min</option>
+        <option value="30" selected>30 min</option>
+        <option value="45">45 min</option>
+        <option value="60">60 min</option>
+      </select>
+    </div>
+
+    <div id="slots" class="grid"></div>
+
+    <dialog id="bookDialog">
+      <div class="modal">
+        <h3 id="slotTitle">Confirm booking</h3>
+        <form id="bookForm">
+          <input type="hidden" id="isoStart" />
+          <label>Your name</label>
+          <input type="text" id="name" placeholder="Jane Doe" required />
+          <label>Your email</label>
+          <input type="email" id="email" placeholder="jane@example.com" required />
+          <div id="msg"></div>
+          <div class="footer">
+            <button type="button" onclick="closeDialog()">Cancel</button>
+            <button class="primary" type="submit">Book</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+  </div>
+
+<script>
+const API_BASE = 'https://script.google.com/macros/s/AKfycbyRkb7oKDpPO-vXj-Btvaa2xx2ykqQbFvq0M3dXMTNVqBHovpuHV9MXHneXWlcKMTnYSA/exec';
+
+const slotsEl = document.getElementById('slots');
+const dlg = document.getElementById('bookDialog');
+const slotTitleEl = document.getElementById('slotTitle');
+const isoStartEl = document.getElementById('isoStart');
+const durationSel = document.getElementById('duration');
+const bookForm = document.getElementById('bookForm');
+const msgEl = document.getElementById('msg');
+
+async function fetchSlots() {
+  slotsEl.innerHTML = '';
+  try {
+    const days = 14;
+    const duration = encodeURIComponent(durationSel.value);
+    const url = `${API_BASE}?action=slots&days=${days}&duration=${duration}`;
+    const res = await fetch(url, { method: 'GET' });
+    const data = await res.json();
+    renderSlots(data.slots || []);
+  } catch (e) {
+    slotsEl.innerHTML = `<div class="card error">Failed to load slots.</div>`;
+  }
+}
+
+function renderSlots(slots) {
+  if (!slots.length) {
+    slotsEl.innerHTML = `<div class="card">No slots available right now. Please check back soon.</div>`;
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  slots.forEach(s => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="slot">
+        <div>${s.display}</div>
+        <button class="primary">Book</button>
+      </div>`;
+    card.querySelector('button').addEventListener('click', () => openDialog(s));
+    frag.appendChild(card);
+  });
+  slotsEl.appendChild(frag);
+}
+
+function openDialog(slot) {
+  isoStartEl.value = slot.start;
+  slotTitleEl.textContent = `Confirm: ${slot.display}`;
+  msgEl.innerHTML = '';
+  dlg.showModal();
+}
+
+function closeDialog() { dlg.close(); }
+
+bookForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  msgEl.innerHTML = '';
+  const payload = {
+    name: document.getElementById('name').value.trim(),
+    email: document.getElementById('email').value.trim(),
+    isoStart: isoStartEl.value,
+    duration: Number(durationSel.value)
+  };
+  if (!payload.name || !payload.email) return;
+
+  try {
+    const res = await fetch(API_BASE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.ok) {
+      msgEl.innerHTML = `<div class="notice">Booked! We’ve emailed your invite. <br><small><a href="${data.htmlLink}" target="_blank" rel="noopener">View in Google Calendar</a></small></div>`;
+      await fetchSlots();
+    } else {
+      msgEl.innerHTML = `<div class="error">${data.error || 'Booking failed.'}</div>`;
+    }
+  } catch (err) {
+    msgEl.innerHTML = `<div class="error">Network error. Please try again.</div>`;
+  }
+});
+
+fetchSlots();
+</script>
+</body>
+</html>
