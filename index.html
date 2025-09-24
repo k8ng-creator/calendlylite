@@ -1,26 +1,28 @@
-<!doctype html> 
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>Book time with Kate</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 0; background:#fafafa; color:#111; }
-    .wrap { max-width: 780px; margin: 40px auto; padding: 0 16px; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin:0; background:#f4f4f5; color:#111; }
+    .wrap { max-width: 880px; margin: 40px auto; padding: 0 16px; }
     h1 { font-size: 28px; margin: 0 0 8px; }
     p.muted { color:#555; margin-top:0; }
-    .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap:12px; margin: 24px 0; }
-    .card { background:#fff; border:1px solid #eee; border-radius:16px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,0.04); }
+    .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap:12px; margin: 24px 0; }
+    .card { background:#fff; border:1px solid #e9e9ee; border-radius:16px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,0.04); }
     .slot { display:flex; justify-content:space-between; align-items:center; gap:8px; }
-    button { cursor:pointer; border:1px solid #ddd; background:#fff; padding:8px 12px; border-radius:999px; }
-    button.primary { background:#111; color:#fff; border-color:#111; }
-    dialog { border:none; border-radius:16px; padding:0; max-width: 520px; width: 100%; }
-    .modal { padding: 20px; }
+    .pill { padding:6px 10px; border-radius:999px; background:#eee; font-size:12px; }
+    button { cursor:pointer; border:1px solid #111; background:#111; color:#fff; padding:10px 16px; border-radius:999px; }
+    button.secondary { background:#fff; color:#111; }
+    dialog { border:none; border-radius:16px; padding:0; max-width: 560px; width: 100%; }
+    .modal { padding: 22px; background:#fff; }
     label { display:block; margin:12px 0 6px; font-size:14px; color:#333; }
     input[type="text"], input[type="email"] { width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:10px; }
-    .footer { margin-top: 8px; display:flex; justify-content:flex-end; gap:8px; }
+    .footer { margin-top: 14px; display:flex; justify-content:flex-end; gap:8px; }
     .notice { padding:12px; background:#f2fff4; border:1px solid #d6f5da; border-radius:12px; margin-top:12px; }
     .error { padding:12px; background:#fff4f4; border:1px solid #ffd6d6; border-radius:12px; margin-top:12px; color:#a00; }
+    select { padding:6px 10px; border-radius:10px; border:1px solid #ddd; }
   </style>
 </head>
 <body>
@@ -28,7 +30,7 @@
     <h1>Book time with Kate</h1>
     <p class="muted">Pick a time that works for you. You’ll get a calendar invite + Meet link by email.</p>
 
-    <div style="display:flex; gap:8px; align-items:center;">
+    <div style="display:flex; gap:10px; align-items:center;">
       <label for="duration" style="margin:0;">Duration</label>
       <select id="duration" onchange="fetchSlots()">
         <option value="15">15 min</option>
@@ -36,6 +38,7 @@
         <option value="45">45 min</option>
         <option value="60">60 min</option>
       </select>
+      <span class="pill" id="statusPill" hidden>Loading…</span>
     </div>
 
     <div id="slots" class="grid"></div>
@@ -51,7 +54,7 @@
           <input type="email" id="email" placeholder="jane@example.com" required />
           <div id="msg"></div>
           <div class="footer">
-            <button type="button" onclick="closeDialog()">Cancel</button>
+            <button type="button" class="secondary" onclick="closeDialog()">Cancel</button>
             <button class="primary" type="submit">Book</button>
           </div>
         </form>
@@ -60,7 +63,7 @@
   </div>
 
 <script>
-const API_BASE = 'https://script.google.com/macros/s/AKfycbwyFdfauyH697q7NYNgb65EMZl000VHT-J6l-NKEF-r9_rd0gf032kyOu6Z63uyrYG5GA/exec';
+const API_BASE = "https://script.google.com/macros/s/AKfycbzGOTDwAQZN53N65gXTbufWS3hEYYL7jCMIliH7vbeN7wuAF1lgpDDb8bgKiFFKv03Brg/exec";
 
 const slotsEl = document.getElementById('slots');
 const dlg = document.getElementById('bookDialog');
@@ -69,18 +72,23 @@ const isoStartEl = document.getElementById('isoStart');
 const durationSel = document.getElementById('duration');
 const bookForm = document.getElementById('bookForm');
 const msgEl = document.getElementById('msg');
+const pill = document.getElementById('statusPill');
 
 async function fetchSlots() {
   slotsEl.innerHTML = '';
+  pill.hidden = false;
   try {
     const days = 14;
     const duration = encodeURIComponent(durationSel.value);
     const url = `${API_BASE}?action=slots&days=${days}&duration=${duration}`;
     const res = await fetch(url, { method: 'GET' });
-    const data = await res.json();
+    const txt = await res.text();       // be lenient about content-type
+    const data = JSON.parse(txt);
     renderSlots(data.slots || []);
   } catch (e) {
     slotsEl.innerHTML = `<div class="card error">Failed to load slots.</div>`;
+  } finally {
+    pill.hidden = true;
   }
 }
 
@@ -116,21 +124,21 @@ function closeDialog() { dlg.close(); }
 bookForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   msgEl.innerHTML = '';
-  const payload = {
-    name: document.getElementById('name').value.trim(),
-    email: document.getElementById('email').value.trim(),
-    isoStart: isoStartEl.value,
-    duration: Number(durationSel.value)
-  };
-  if (!payload.name || !payload.email) return;
+  const name = document.getElementById('name').value.trim();
+  const email = document.getElementById('email').value.trim();
+  const isoStart = isoStartEl.value;
+  const duration = String(durationSel.value);
+
+  if (!name || !email) return;
 
   try {
-    const res = await fetch(API_BASE, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json();
+    const url =
+      `${API_BASE}?action=book&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&isoStart=${encodeURIComponent(isoStart)}&duration=${encodeURIComponent(duration)}`;
+
+    const res = await fetch(url, { method: 'GET' }); // GET to avoid CORS preflight
+    const txt = await res.text();
+    const data = JSON.parse(txt);
+
     if (data.ok) {
       msgEl.innerHTML = `<div class="notice">Booked! We’ve emailed your invite. <br><small><a href="${data.htmlLink}" target="_blank" rel="noopener">View in Google Calendar</a></small></div>`;
       await fetchSlots();
