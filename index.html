@@ -15,14 +15,29 @@
     .pill { padding:6px 10px; border-radius:999px; background:#eee; font-size:12px; }
     button { cursor:pointer; border:1px solid #111; background:#111; color:#fff; padding:10px 16px; border-radius:999px; }
     button.secondary { background:#fff; color:#111; }
-    dialog { border:none; border-radius:16px; padding:0; max-width: 560px; width: 100%; }
-    .modal { padding: 22px; background:#fff; }
-    label { display:block; margin:12px 0 6px; font-size:14px; color:#333; }
-    input[type="text"], input[type="email"] { width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:10px; }
-    .footer { margin-top: 14px; display:flex; justify-content:flex-end; gap:8px; }
-    .notice { padding:12px; background:#f2fff4; border:1px solid #d6f5da; border-radius:12px; margin-top:12px; }
-    .error { padding:12px; background:#fff4f4; border:1px solid #ffd6d6; border-radius:12px; margin-top:12px; color:#a00; }
-    select { padding:6px 10px; border-radius:10px; border:1px solid #ddd; }
+   
+    /* Dialog + modal */
+dialog {
+  border: none;
+  border-radius: 16px;
+  padding: 0;
+  width: min(640px, 92vw);     /* wider but responsive */
+  max-width: 640px;
+  max-height: 88vh;            /* never exceed viewport */
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,.2);
+}
+dialog::backdrop {
+  background: rgba(0,0,0,.35);
+}
+
+.modal {
+  padding: 22px;
+  background: #fff;
+  overflow: auto;              /* scroll inside if too tall */
+  max-height: 88vh;
+}
+
   </style>
 </head>
 <body>
